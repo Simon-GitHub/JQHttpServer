@@ -125,7 +125,7 @@ private:
     void inspectionBufferSetup1();
 
     void inspectionBufferSetup2();
-
+private slots:
     void onBytesWritten(const qint64 &written);
 
 private:
@@ -144,15 +144,15 @@ private:
     QByteArray requestBody_;
 
     QMap< QString, QString > requestHeader_;
-    bool headerAcceptedFinished_ = false;
-    bool contentAcceptedFinished_ = false;
-    qint64 contentLength_ = -1;
+    bool headerAcceptedFinished_;
+    bool contentAcceptedFinished_;
+    qint64 contentLength_;
 
-    int replyHttpCode_ = -1;
+    int replyHttpCode_;
     QByteArray replyBuffer_;
-    qint64 replyBodySize_ = -1;
+    qint64 replyBodySize_;
 
-    qint64 waitWrittenByteCount_ = -1;
+    qint64 waitWrittenByteCount_;
     QSharedPointer< QIODevice > ioDeviceForReply_;
 };
 
@@ -230,8 +230,8 @@ private:
 private:
     QPointer< QTcpServer > tcpServer_;
 
-    QHostAddress listenAddress_ = QHostAddress::Any;
-    quint16 listenPort_ = 0;
+    QHostAddress listenAddress_;
+    quint16 listenPort_;
 };
 
 #ifndef QT_NO_SSL
@@ -252,10 +252,11 @@ public:
             const quint16 &port,
             const QString &crtFilePath,
             const QString &keyFilePath,
-            const QList< QPair< QString, QSsl::EncodingFormat > > &caFileList = { }, // [ { filePath, format } ]
+            const QList< QPair< QString, QSsl::EncodingFormat > > &caFileList = QList< QPair< QString, QSsl::EncodingFormat > >(), // [ { filePath, format } ]
             const QSslSocket::PeerVerifyMode &peerVerifyMode = QSslSocket::VerifyNone
         );
-
+private slots:
+    void onSslSocketEncrypted();
 private:
     bool isRunning();
 
@@ -266,8 +267,8 @@ private:
 private:
     QPointer< SslServerHelper > tcpServer_;
 
-    QHostAddress listenAddress_ = QHostAddress::Any;
-    quint16 listenPort_ = 0;
+    QHostAddress listenAddress_;
+    quint16 listenPort_;
 
     QSharedPointer< QSslConfiguration > sslConfiguration_;
 };

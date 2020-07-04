@@ -58,9 +58,9 @@ class JQLIBRARY_EXPORT HTTP
     Q_DISABLE_COPY( HTTP )
 
 public:
-    HTTP() = default;
+    HTTP(){}
 
-    ~HTTP() = default;
+    ~HTTP(){}
 
 public:
     inline QNetworkAccessManager &manage() { return manage_; }

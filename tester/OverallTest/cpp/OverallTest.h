@@ -19,9 +19,9 @@ class OverallTest: public QObject
     Q_DISABLE_COPY( OverallTest )
 
 public:
-    OverallTest() = default;
+    OverallTest(){}
 
-    ~OverallTest() = default;
+    ~OverallTest(){}
 
 private slots:
     void initTestCase();

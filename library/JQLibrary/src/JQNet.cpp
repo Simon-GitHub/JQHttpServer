@@ -33,7 +33,7 @@
 QNetworkAddressEntry JQNet::getFirstNetworkAddressEntry()
 {
     auto list = JQNet::getNetworkAddressEntryAndInterface();
-    if ( list.isEmpty() ) { return { }; }
+    if ( list.isEmpty() ) { return QNetworkAddressEntry(); }
 
     return list.first().first;
 }
@@ -41,7 +41,7 @@ QNetworkAddressEntry JQNet::getFirstNetworkAddressEntry()
 QPair< QNetworkAddressEntry, QNetworkInterface > JQNet::getFirstNetworkAddressEntryAndInterface(const bool &ridVm)
 {
     auto list = JQNet::getNetworkAddressEntryAndInterface( ridVm );
-    if ( list.isEmpty() ) { return { }; }
+    if ( list.isEmpty() ) { return QPair< QNetworkAddressEntry, QNetworkInterface >(); }
 
     return list.first();
 }
@@ -50,8 +50,11 @@ QList< QPair< QNetworkAddressEntry, QNetworkInterface > > JQNet::getNetworkAddre
 {
     QList< QPair< QNetworkAddressEntry, QNetworkInterface > > result;
 
-    for ( const auto &interface: static_cast< const QList< QNetworkInterface > >( QNetworkInterface::allInterfaces() ) )
+//    for ( const auto &interface: static_cast< const QList< QNetworkInterface > >( QNetworkInterface::allInterfaces() ) )
+    const QList< QNetworkInterface >& listInterface = QNetworkInterface::allInterfaces();
+    for(int i = 0; i < listInterface.size(); ++i)
     {
+        const QNetworkInterface& interface = listInterface[i];
         if ( interface.flags() != ( QNetworkInterface::IsUp |
                                     QNetworkInterface::IsRunning |
                                     QNetworkInterface::CanBroadcast |
@@ -59,11 +62,14 @@ QList< QPair< QNetworkAddressEntry, QNetworkInterface > > JQNet::getNetworkAddre
 
         if ( ridVm && interface.humanReadableName().startsWith( "vm" ) ) { continue; }
 
-        for ( const auto &entry: static_cast< QList<QNetworkAddressEntry> >( interface.addressEntries() ) )
+//        for ( const auto &entry: static_cast< QList<QNetworkAddressEntry> >( interface.addressEntries() ) )
+        const QList<QNetworkAddressEntry>& listEntry = interface.addressEntries();
+        for(int j = 0; j < listEntry.size(); ++j)
         {
+            const QNetworkAddressEntry& entry = listEntry[i];
             if ( entry.ip().toIPv4Address() )
             {
-                result.push_back( { entry, interface } );
+                result.push_back( qMakePair( entry, interface ) );
             }
         }
     }
@@ -160,7 +166,7 @@ void JQNet::HTTP::get(
         onError,
         [ onError ]()
         {
-            onError( { }, QNetworkReply::TimeoutError, { } );
+            onError( QList< QNetworkReply::RawHeaderPair >(), QNetworkReply::TimeoutError, QByteArray() );
         }
     );
 }
@@ -218,7 +224,7 @@ void JQNet::HTTP::deleteResource(
         onError,
         [ onError ]()
         {
-            onError( { }, QNetworkReply::TimeoutError, { } );
+            onError( QList< QNetworkReply::RawHeaderPair >(), QNetworkReply::TimeoutError, QByteArray() );
         }
     );
 }
@@ -319,7 +325,7 @@ void JQNet::HTTP::post(
         onError,
         [ onError ]()
         {
-            onError( { }, QNetworkReply::TimeoutError, { } );
+            onError( QList< QNetworkReply::RawHeaderPair >(), QNetworkReply::TimeoutError, QByteArray() );
         }
     );
 }
@@ -417,7 +423,7 @@ void JQNet::HTTP::put(
         onError,
         [ onError ]()
         {
-            onError( { }, QNetworkReply::TimeoutError, { } );
+            onError( QList< QNetworkReply::RawHeaderPair >(), QNetworkReply::TimeoutError, QByteArray() );
         }
     );
 }
@@ -491,7 +497,7 @@ QPair< bool, QByteArray > JQNet::HTTP::get(const QString &url, const int &timeou
 
     const auto &&isSucceed = HTTP().get( networkRequest, receiveBuffer, timeout );
 
-    return { isSucceed, receiveBuffer };
+    return qMakePair( isSucceed, receiveBuffer );
 }
 
 QPair< bool, QByteArray > JQNet::HTTP::get(const QNetworkRequest &request, const int &timeout)
@@ -501,7 +507,7 @@ QPair< bool, QByteArray > JQNet::HTTP::get(const QNetworkRequest &request, const
 
     const auto &&isSucceed = http.get( request, receiveBuffer, timeout );
 
-    return { isSucceed, receiveBuffer };
+    return qMakePair( isSucceed, receiveBuffer );
 }
 
 QPair< bool, QByteArray > JQNet::HTTP::deleteResource(const QString &url, const int &timeout)
@@ -511,7 +517,7 @@ QPair< bool, QByteArray > JQNet::HTTP::deleteResource(const QString &url, const 
 
     const auto &&isSucceed = HTTP().deleteResource( networkRequest, receiveBuffer, timeout );
 
-    return { isSucceed, receiveBuffer };
+    return qMakePair( isSucceed, receiveBuffer );
 }
 
 QPair< bool, QByteArray > JQNet::HTTP::deleteResource(const QNetworkRequest &request, const int &timeout)
@@ -521,7 +527,7 @@ QPair< bool, QByteArray > JQNet::HTTP::deleteResource(const QNetworkRequest &req
 
     const auto &&isSucceed = http.deleteResource( request, receiveBuffer, timeout );
 
-    return { isSucceed, receiveBuffer };
+    return qMakePair( isSucceed, receiveBuffer );
 }
 
 QPair< bool, QByteArray > JQNet::HTTP::post(const QString &url, const QByteArray &body, const int &timeout)
@@ -534,7 +540,7 @@ QPair< bool, QByteArray > JQNet::HTTP::post(const QString &url, const QByteArray
 
     const auto &&isSucceed = HTTP().post( networkRequest, body, rawHeaderPairs, receiveBuffer, timeout );
 
-    return { isSucceed, receiveBuffer };
+    return qMakePair( isSucceed, receiveBuffer );
 }
 
 QPair< bool, QByteArray > JQNet::HTTP::post(const QNetworkRequest &request, const QByteArray &body, const int &timeout)
@@ -545,7 +551,7 @@ QPair< bool, QByteArray > JQNet::HTTP::post(const QNetworkRequest &request, cons
 
     const auto &&isSucceed = http.post( request, body, rawHeaderPairs, receiveBuffer, timeout );
 
-    return { isSucceed, receiveBuffer };
+    return qMakePair( isSucceed, receiveBuffer );
 }
 
 QPair< bool, QPair< QList< QNetworkReply::RawHeaderPair >, QByteArray > > JQNet::HTTP::post2(const QNetworkRequest &request, const QByteArray &body, const int &timeout)
@@ -556,7 +562,7 @@ QPair< bool, QPair< QList< QNetworkReply::RawHeaderPair >, QByteArray > > JQNet:
 
     const auto &&isSucceed = http.post( request, body, rawHeaderPairs, receiveBuffer, timeout );
 
-    return { isSucceed, { rawHeaderPairs, receiveBuffer } };
+    return qMakePair( isSucceed, qMakePair( rawHeaderPairs, receiveBuffer ) );
 }
 
 QPair< bool, QByteArray > JQNet::HTTP::post(const QNetworkRequest &request, const QSharedPointer<QHttpMultiPart> &multiPart, const int &timeout)
@@ -566,7 +572,7 @@ QPair< bool, QByteArray > JQNet::HTTP::post(const QNetworkRequest &request, cons
 
     const auto &&isSucceed = http.post( request, multiPart, receiveBuffer, timeout );
 
-    return { isSucceed, receiveBuffer };
+    return qMakePair( isSucceed, receiveBuffer );
 }
 
 QPair< bool, QByteArray > JQNet::HTTP::put(const QString &url, const QByteArray &body, const int &timeout)
@@ -578,7 +584,7 @@ QPair< bool, QByteArray > JQNet::HTTP::put(const QString &url, const QByteArray 
 
     const auto &&isSucceed = HTTP().put( networkRequest, body, receiveBuffer, timeout );
 
-    return { isSucceed, receiveBuffer };
+    return qMakePair( isSucceed, receiveBuffer );
 }
 
 QPair< bool, QByteArray > JQNet::HTTP::put(const QNetworkRequest &request, const QByteArray &body, const int &timeout)
@@ -588,7 +594,7 @@ QPair< bool, QByteArray > JQNet::HTTP::put(const QNetworkRequest &request, const
 
     const auto &&isSucceed = http.put( request, body, receiveBuffer, timeout );
 
-    return { isSucceed, receiveBuffer };
+    return qMakePair( isSucceed, receiveBuffer );
 }
 
 QPair< bool, QByteArray > JQNet::HTTP::put(const QNetworkRequest &request, const QSharedPointer< QHttpMultiPart > &multiPart, const int &timeout)
@@ -598,7 +604,7 @@ QPair< bool, QByteArray > JQNet::HTTP::put(const QNetworkRequest &request, const
 
     const auto &&isSucceed = http.put( request, multiPart, receiveBuffer, timeout );
 
-    return { isSucceed, receiveBuffer };
+    return qMakePair( isSucceed, receiveBuffer );
 }
 
 #if !( defined Q_OS_LINUX ) && ( QT_VERSION >= QT_VERSION_CHECK( 5, 9, 0 ) )
@@ -611,7 +617,7 @@ QPair< bool, QByteArray > JQNet::HTTP::patch(const QString &url, const QByteArra
 
     const auto &&isSucceed = HTTP().patch( networkRequest, body, receiveBuffer, timeout );
 
-    return { isSucceed, receiveBuffer };
+    return qMakePair( isSucceed, receiveBuffer );
 }
 
 QPair< bool, QByteArray > JQNet::HTTP::patch(const QNetworkRequest &request, const QByteArray &body, const int &timeout)
@@ -621,7 +627,7 @@ QPair< bool, QByteArray > JQNet::HTTP::patch(const QNetworkRequest &request, con
 
     const auto &&isSucceed = http.patch( request, body, receiveBuffer, timeout );
 
-    return { isSucceed, receiveBuffer };
+    return qMakePair( isSucceed, receiveBuffer );
 }
 #endif
 

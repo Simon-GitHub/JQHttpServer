@@ -130,6 +130,15 @@ JQHttpServer::Session::Session(const QPointer< QIODevice > &socket):
     ioDevice_( socket ),
     autoCloseTimer_( new QTimer )
 {
+    headerAcceptedFinished_ = false;
+    contentAcceptedFinished_ = false;
+    contentLength_ = -1;
+
+    replyHttpCode_ = -1;
+    replyBodySize_ = -1;
+
+    waitWrittenByteCount_ = -1;
+
     ++remainSession_;
 //    qDebug() << "remainSession:" << remainSession_ << this;
 
@@ -151,12 +160,14 @@ JQHttpServer::Session::Session(const QPointer< QIODevice > &socket):
 #ifndef QT_NO_SSL
     if ( qobject_cast< QSslSocket * >( socket ) )
     {
-        connect( qobject_cast< QSslSocket * >( socket ), &QSslSocket::encryptedBytesWritten, std::bind( &JQHttpServer::Session::onBytesWritten, this, std::placeholders::_1 ) );
+		//connect( qobject_cast< QSslSocket * >( socket ), &QSslSocket::encryptedBytesWritten, std::bind( &JQHttpServer::Session::onBytesWritten, this, std::placeholders::_1 ) );
+        connect( qobject_cast< QSslSocket * >( socket ), &QSslSocket::encryptedBytesWritten, this, &JQHttpServer::Session::onBytesWritten );
     }
     else
 #endif
     {
-        connect( ioDevice_.data(), &QIODevice::bytesWritten, std::bind( &JQHttpServer::Session::onBytesWritten, this, std::placeholders::_1 ) );
+		//connect( ioDevice_.data(), &QIODevice::bytesWritten, std::bind( &JQHttpServer::Session::onBytesWritten, this, std::placeholders::_1 ) );
+        connect( ioDevice_.data(), &QIODevice::bytesWritten, this, &JQHttpServer::Session::onBytesWritten );
     }
 
     autoCloseTimer_->setInterval( 30 * 1000 );
@@ -179,49 +190,49 @@ JQHttpServer::Session::~Session()
 
 QString JQHttpServer::Session::requestSourceIp() const
 {
-    JQHTTPSERVER_SESSION_PROTECTION( "requestSource", { } )
+    JQHTTPSERVER_SESSION_PROTECTION( "requestSource", "" )
 
     return requestSourceIp_;
 }
 
 QString JQHttpServer::Session::requestMethod() const
 {
-    JQHTTPSERVER_SESSION_PROTECTION( "requestMethod", { } )
+    JQHTTPSERVER_SESSION_PROTECTION( "requestMethod", "" )
 
     return requestMethod_;
 }
 
 QString JQHttpServer::Session::requestUrl() const
 {
-    JQHTTPSERVER_SESSION_PROTECTION( "requestUrl", { } )
+    JQHTTPSERVER_SESSION_PROTECTION( "requestUrl", "" )
 
     return requestUrl_;
 }
 
 QString JQHttpServer::Session::requestCrlf() const
 {
-    JQHTTPSERVER_SESSION_PROTECTION( "requestCrlf", { } )
+    JQHTTPSERVER_SESSION_PROTECTION( "requestCrlf", "" )
 
     return requestCrlf_;
 }
 
 QMap< QString, QString > JQHttpServer::Session::requestHeader() const
 {
-    JQHTTPSERVER_SESSION_PROTECTION( "requestHeader", { } )
+    JQHTTPSERVER_SESSION_PROTECTION( "requestHeader", QMap< QString, QString >() )
 
     return requestHeader_;
 }
 
 QByteArray JQHttpServer::Session::requestBody() const
 {
-    JQHTTPSERVER_SESSION_PROTECTION( "requestBody", { } )
+    JQHTTPSERVER_SESSION_PROTECTION( "requestBody", QByteArray() )
 
     return requestBody_;
 }
 
 QString JQHttpServer::Session::requestUrlPath() const
 {
-    JQHTTPSERVER_SESSION_PROTECTION( "requestUrlPath", { } )
+    JQHTTPSERVER_SESSION_PROTECTION( "requestUrlPath", "" )
 
     QString result;
     const auto indexForQueryStart = requestUrl_.indexOf( "?" );
@@ -274,14 +285,16 @@ QStringList JQHttpServer::Session::requestUrlPathSplitToList() const
 QMap< QString, QString > JQHttpServer::Session::requestUrlQuery() const
 {
     const auto indexForQueryStart = requestUrl_.indexOf( "?" );
-    if ( indexForQueryStart < 0 ) { return { }; }
+    if ( indexForQueryStart < 0 ) { return QMap< QString, QString >(); }
 
     QMap< QString, QString > result;
 
     auto lines = QUrl::fromEncoded( requestUrl_.mid( indexForQueryStart + 1 ).toUtf8() ).toString().split( "&" );
 
-    for ( const auto &line_: lines )
+//    for ( const auto &line_: lines )
+    for(int i = 0; i < lines.size(); ++i)
     {
+        const auto& line_ = lines[i];
         auto line = line_;
         line.replace( "%5B", "[" );
         line.replace( "%5D", "]" );
@@ -936,7 +949,10 @@ void JQHttpServer::AbstractManage::handleAccepted(const QPointer< Session > &ses
 // TcpServerManage
 JQHttpServer::TcpServerManage::TcpServerManage(const int &handleMaxThreadCount):
     AbstractManage( handleMaxThreadCount )
-{ }
+{
+    listenAddress_ = QHostAddress::Any;
+    listenPort_ = 0;
+}
 
 JQHttpServer::TcpServerManage::~TcpServerManage()
 {
@@ -1007,7 +1023,7 @@ namespace JQHttpServer
 
 class SslServerHelper: public QTcpServer
 {
-    void incomingConnection(qintptr socketDescriptor) final
+    void incomingConnection(qintptr socketDescriptor) /*final*/
     {
         onIncomingConnectionCallback_( socketDescriptor );
     }
@@ -1020,7 +1036,10 @@ public:
 
 JQHttpServer::SslServerManage::SslServerManage(const int &handleMaxThreadCount):
     AbstractManage( handleMaxThreadCount )
-{ }
+{
+    listenAddress_ = QHostAddress::Any;
+    listenPort_ = 0;
+}
 
 JQHttpServer::SslServerManage::~SslServerManage()
 {
@@ -1060,8 +1079,10 @@ bool JQHttpServer::SslServerManage::listen(
     QSslKey sslKey( fileForKey.readAll(), QSsl::Rsa, QSsl::Pem, QSsl::PrivateKey );
 
     QList< QSslCertificate > caCertificates;
-    for ( const auto &caFile: caFileList )
+    //for ( const auto &caFile: caFileList )
+    for(int i = 0; i < caFileList.size(); ++i)
     {
+        const auto& caFile = caFileList[i];
         QFile fileForCa( caFile.first );
         if ( !fileForCa.open( QIODevice::ReadOnly ) )
         {
@@ -1081,6 +1102,13 @@ bool JQHttpServer::SslServerManage::listen(
     sslConfiguration_->setCaCertificates( caCertificates );
 
     return this->initialize();
+}
+
+void JQHttpServer::SslServerManage::onSslSocketEncrypted()
+{
+    QSslSocket* sslSocket_ = dynamic_cast<QSslSocket*>( sender());
+    if(!sslSocket_) return;
+    this->newSession( new Session( sslSocket_ ) );
 }
 
 bool JQHttpServer::SslServerManage::isRunning()
@@ -1104,10 +1132,8 @@ bool JQHttpServer::SslServerManage::onStart()
 
         sslSocket->setSslConfiguration( *sslConfiguration_ );
 
-        QObject::connect( sslSocket, &QSslSocket::encrypted, [ this, sslSocket ]()
-        {
-            this->newSession( new Session( sslSocket ) );
-        } );
+//        QObject::connect( sslSocket, &QSslSocket::encrypted, [ this, sslSocket ]()
+        QObject::connect( sslSocket, &QSslSocket::encrypted, this, &JQHttpServer::SslServerManage::onSslSocketEncrypted);
 
 //        QObject::connect( sslSocket, static_cast< void(QSslSocket::*)(const QList<QSslError> &errors) >(&QSslSocket::sslErrors), [](const QList<QSslError> &errors)
 //        {

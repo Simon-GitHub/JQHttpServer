@@ -16,9 +16,9 @@ class BenchMark: public QObject
     Q_DISABLE_COPY( BenchMark )
 
 public:
-    BenchMark() = default;
+	BenchMark() {};
 
-    ~BenchMark() = default;
+	~BenchMark() {};
 
 private slots:
     void initTestCase();
